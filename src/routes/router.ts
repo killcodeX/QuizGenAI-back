@@ -1,12 +1,14 @@
-import express, { Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 
-const router = express.Router();
+const router = Router();
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
-router.get("/", async (req: Request, res: Response) => {
-  const users = await prisma.user.findMany();
-  res.json(users);
-});
+router.get(
+  "/protected",
+  async (req: Request, res: Response, next: NextFunction) => {
+    res.json({ message: "Hello World" });
+  }
+);
 
 export default router;

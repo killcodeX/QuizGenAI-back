@@ -4,6 +4,9 @@ import session from "express-session";
 import cors from "cors";
 import { PrismaClient } from "@prisma/client";
 import router from "./routes/router";
+import errorHandler from "./middleware/errorHandler";
+import passport from "./routes/passport";
+import authRouter from "./routes/auth";
 
 dotenv.config();
 
@@ -22,12 +25,14 @@ app.use(
     saveUninitialized: true,
   })
 );
+app.use(passport.initialize());
 
 // Routes
+app.use("/auth", authRouter);
 app.use("/quizgenai", router);
 
 // Global Error Handler (Must be placed after routes)
-// app.use(errorHandler);
+app.use(errorHandler);
 
 // Graceful Shutdown for Prisma
 process.on("SIGINT", async () => {

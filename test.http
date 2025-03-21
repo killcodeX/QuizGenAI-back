@@ -1,0 +1,12 @@
+//curl -X POST http://localhost:8000/auth/signup -H "Content-Type: application/json" -d '{"name":"Aaquib","email": "test@example.com", "password": "password123"}'
+
+
+//curl -X POST http://localhost:8000/auth/login -H "Content-Type: application/json" -d '{"email": "test@example.com", "password": "password123"}'
+
+
+//token = ""
+
+
+curl -X GET http://localhost:8000/quizgenai/protected"
+
+
