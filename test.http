@@ -4,9 +4,20 @@
 //curl -X POST http://localhost:8000/auth/login -H "Content-Type: application/json" -d '{"email": "test@example.com", "password": "password123"}'
 
 
-//token = ""
+//token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImZkNTZlYzdmLWI3MTktNDA0OS1iNjNiLTQxMDEyNjJjZGZlMCIsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsImlhdCI6MTc0MjYwMjk2MSwiZXhwIjoxNzQyNjg5MzYxfQ.2m_HmeSpP31ozH25dZlrM41F_fPpvWKdottHBvAVPKc"
 
 
-curl -X GET http://localhost:8000/quizgenai/protected"
+//curl -X GET http://localhost:8000/quizgenai/protected -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImZkNTZlYzdmLWI3MTktNDA0OS1iNjNiLTQxMDEyNjJjZGZlMCIsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsImlhdCI6MTc0MjYwMjk2MSwiZXhwIjoxNzQyNjg5MzYxfQ.2m_HmeSpP31ozH25dZlrM41F_fPpvWKdottHBvAVPKc"
+
+
+curl -X POST http://localhost:8000/quizgenai/generate \
+     -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImZkNTZlYzdmLWI3MTktNDA0OS1iNjNiLTQxMDEyNjJjZGZlMCIsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsImlhdCI6MTc0MjYwMjk2MSwiZXhwIjoxNzQyNjg5MzYxfQ.2m_HmeSpP31ozH25dZlrM41F_fPpvWKdottHBvAVPKc" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "topic": "JavaScript",
+           "difficulty": "medium",
+           "numQuestions": 5
+         }'
+
 
 
