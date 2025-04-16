@@ -14,22 +14,103 @@ datasource db {
 }
 
 model User {
-  id       String  @id @default(uuid())
-  email    String  @unique
-  name     String?
-  password String?   // Nullable because Google users won't have passwords
-  googleId String? @unique // Unique identifier for Google users
-  quizzes  Quiz[]
+  id                String           @id @default(uuid())
+  email             String           @unique
+  name              String?
+  password          String?
+  googleId          String?          @unique
+  profileImage      String?
+  isActive          Boolean          @default(true)
+  role              String           @default("USER")
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @default(now()) // Add default value here
+  quizAttempts      QuizAttempt[]
+  favoriteTopics    UserFavorite[]
+  lastLogin         DateTime?
+}
+
+model Topic {
+  id          String        @id @default(uuid())
+  name        String        @unique
+  description String?
+  quizzes     Quiz[]
+  userFavorites UserFavorite[]
 }
 
 model Quiz {
-  id         String   @id @default(uuid())
-  user       User     @relation(fields: [userId], references: [id])
-  userId     String
-  topic      String
-  difficulty String
-  questions  Json
-  score      Int
-  createdAt  DateTime @default(now())
+  id          String        @id @default(uuid())
+  title       String
+  topic       Topic         @relation(fields: [topicId], references: [id])
+  topicId     String
+  difficulty  String        // EASY, MEDIUM, HARD
+  description String?
+  isPublished Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  questions   Question[]
+  attempts    QuizAttempt[]
 }
 
+model Question {
+  id          String    @id @default(uuid())
+  quiz        Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quizId      String
+  text        String
+  options     Json      // Array of possible answers
+  correctAnswer String   // Correct answer identifier
+  explanation String?   // Optional explanation for the answer
+  points      Int       @default(1)
+  orderIndex  Int       // For maintaining question order
+  answers     Answer[]
+}
+
+model QuizAttempt {
+  id          String    @id @default(uuid())
+  user        User      @relation(fields: [userId], references: [id])
+  userId      String
+  quiz        Quiz      @relation(fields: [quizId], references: [id])
+  quizId      String
+  score       Int
+  totalPoints Int
+  isCompleted Boolean   @default(false)
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  answers     Answer[]
+}
+
+model Answer {
+  id            String      @id @default(uuid())
+  quizAttempt   QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  attemptId     String
+  question      Question    @relation(fields: [questionId], references: [id])
+  questionId    String
+  userAnswer    String
+  isCorrect     Boolean
+  answeredAt    DateTime    @default(now())
+}
+
+model UserFavorite {
+  id        String    @id @default(uuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  topic     Topic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  topicId   String
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, topicId])  // Prevent duplicate favorites
+}
+
+// For tracking performance statistics
+model UserStatistics {
+  id                String    @id @default(uuid())
+  userId            String    @unique
+  totalQuizzes      Int       @default(0)
+  completedQuizzes  Int       @default(0)
+  correctAnswers    Int       @default(0)
+  wrongAnswers      Int       @default(0)
+  averageAccuracy   Float     @default(0)
+  topicsAttempted   Int       @default(0)
+  lastUpdated       DateTime  @default(now())
+}
+
+  
