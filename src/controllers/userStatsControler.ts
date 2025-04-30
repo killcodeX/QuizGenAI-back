@@ -11,6 +11,11 @@ interface TopicStat {
   userCount: bigint;
 }
 
+interface TopicDistribution {
+  name: string;
+  count: bigint;
+}
+
 export const fetchUserQuizHistory = async (req: Request, res: Response) => {
   const { email } = req.body;
 
@@ -57,7 +62,8 @@ export const fetchUserQuizHistory = async (req: Request, res: Response) => {
       });
 
       return {
-        id: attempt.id, // Using the actual attempt ID from the database
+        id: attempt.id, // This is the attempt ID
+        quizId: attempt.quiz.id, // ADDED: Include the actual quiz ID
         title: attempt.quiz.title,
         score: scoreFormatted,
         date: dateFormatted,
@@ -218,8 +224,6 @@ export const getUserStats = async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { email } });
 
-    console.log(user);
-
     if (!user) {
       return res.status(200).json({ message: "User does not exist" });
     }
@@ -228,7 +232,8 @@ export const getUserStats = async (req: Request, res: Response) => {
       where: { userId: user.id },
     });
 
-    const topicDistribution = await prisma.$queryRaw`
+    // Get the topic distribution with raw query
+    const rawTopicDistribution = await prisma.$queryRaw<TopicDistribution[]>`
         SELECT t.name, COUNT(*) as count
         FROM "QuizAttempt" qa
         JOIN "Quiz" q ON qa."quizId" = q.id
@@ -236,6 +241,14 @@ export const getUserStats = async (req: Request, res: Response) => {
         WHERE qa."userId" = ${user.id}
         GROUP BY t.name
       `;
+
+    // Convert BigInt values to regular numbers
+    const topicDistribution = rawTopicDistribution.map(
+      (item: TopicDistribution) => ({
+        name: item.name,
+        count: Number(item.count),
+      })
+    );
 
     const favoriteTopics = await prisma.userFavorite.findMany({
       where: { userId: user.id },
