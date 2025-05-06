@@ -14,38 +14,38 @@ const prisma = new PrismaClient();
 
 router.get(
   "/popular",
-  authMiddleware as RequestHandler,
-  fetchPopularTopics as RequestHandler
+  authMiddleware as unknown as RequestHandler,
+  fetchPopularTopics as unknown as RequestHandler
 );
 
 router.post(
   "/history",
-  authMiddleware as RequestHandler,
-  fetchUserQuizHistory as RequestHandler
+  authMiddleware as unknown as RequestHandler,
+  fetchUserQuizHistory as unknown as RequestHandler
 );
 
 router.post(
   "/stats",
-  authMiddleware as RequestHandler,
-  getUserStats as RequestHandler
+  authMiddleware as unknown as RequestHandler,
+  getUserStats as unknown as RequestHandler
 );
 
 router.post(
   "/generate",
-  authMiddleware as RequestHandler,
-  quizHandle as RequestHandler
+  authMiddleware as unknown as RequestHandler,
+  quizHandle as unknown as RequestHandler
 );
 
 router.post(
   "/quizes",
-  authMiddleware as RequestHandler,
-  fetchQuiz as RequestHandler
+  authMiddleware as unknown as RequestHandler,
+  fetchQuiz as unknown as RequestHandler
 );
 
 router.post(
   "/save-quiz-result",
-  authMiddleware as RequestHandler,
-  saveQuizResult as RequestHandler
+  authMiddleware as unknown as RequestHandler,
+  saveQuizResult as unknown as RequestHandler
 );
 
 export default router;

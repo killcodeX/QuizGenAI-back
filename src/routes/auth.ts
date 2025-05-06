@@ -23,9 +23,9 @@ const router = Router();
 // );
 
 // Add this route to your router
-router.post("/google-auth", googleAuth as RequestHandler);
-router.post("/signup", signUp as RequestHandler);
-router.post("/login", signIn as RequestHandler);
-router.post("/del-user", delUser as RequestHandler);
+router.post("/google-auth", googleAuth as unknown as RequestHandler);
+router.post("/signup", signUp as unknown as RequestHandler);
+router.post("/login", signIn as unknown as RequestHandler);
+router.post("/del-user", delUser as unknown as RequestHandler);
 
 export default router;
