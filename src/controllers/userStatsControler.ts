@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -12,6 +13,7 @@ interface TopicStat {
 }
 
 interface TopicDistribution {
+  id: string;
   name: string;
   count: bigint;
 }
@@ -228,32 +230,125 @@ export const getUserStats = async (req: Request, res: Response) => {
       return res.status(200).json({ message: "User does not exist" });
     }
 
-    const stats = await prisma.userStatistics.findUnique({
+    // Get quiz attempts data
+    const quizAttempts = await prisma.quizAttempt.findMany({
       where: { userId: user.id },
+      include: {
+        answers: true,
+      },
+    });
+
+    // Calculate statistics
+    const totalQuizzes = quizAttempts.length;
+    const completedQuizzes = quizAttempts.filter((qa) => qa.isCompleted).length;
+    const correctAnswers = quizAttempts.reduce(
+      (sum, qa) => sum + qa.answers.filter((a) => a.isCorrect).length,
+      0
+    );
+    const wrongAnswers = quizAttempts.reduce(
+      (sum, qa) => sum + qa.answers.filter((a) => !a.isCorrect).length,
+      0
+    );
+    const totalAnswers = correctAnswers + wrongAnswers;
+    const averageAccuracy =
+      totalAnswers > 0 ? correctAnswers / totalAnswers : 0;
+
+    // Get unique topics attempted
+    const uniqueTopics = await prisma.quiz.findMany({
+      where: {
+        attempts: {
+          some: {
+            userId: user.id,
+          },
+        },
+      },
+      select: {
+        topicId: true,
+      },
+      distinct: ["topicId"],
+    });
+
+    const attemptedTopicsCount = uniqueTopics.length;
+
+    // Update or create user statistics
+    const stats = await prisma.userStatistics.upsert({
+      where: { userId: user.id },
+      update: {
+        totalQuizzes,
+        completedQuizzes,
+        correctAnswers,
+        wrongAnswers,
+        averageAccuracy,
+        topicsAttempted: attemptedTopicsCount,
+        lastUpdated: new Date(),
+      },
+      create: {
+        userId: user.id,
+        totalQuizzes,
+        completedQuizzes,
+        correctAnswers,
+        wrongAnswers,
+        averageAccuracy,
+        topicsAttempted: attemptedTopicsCount,
+        lastUpdated: new Date(),
+      },
     });
 
     // Get the topic distribution with raw query
     const rawTopicDistribution = await prisma.$queryRaw<TopicDistribution[]>`
-        SELECT t.name, COUNT(*) as count
+        SELECT t.id, t.name, COUNT(*) as count
         FROM "QuizAttempt" qa
         JOIN "Quiz" q ON qa."quizId" = q.id
         JOIN "Topic" t ON q."topicId" = t.id
         WHERE qa."userId" = ${user.id}
-        GROUP BY t.name
+        GROUP BY t.id, t.name
       `;
 
-    // Convert BigInt values to regular numbers
+    // Convert BigInt values to regular numbers and include topic ID
     const topicDistribution = rawTopicDistribution.map(
       (item: TopicDistribution) => ({
+        id: item.id,
         name: item.name,
         count: Number(item.count),
       })
     );
 
+    // Get top 5 most attempted topics by the user
+    const topAttemptedTopics = await prisma.$queryRaw<
+      { id: string; name: string; count: BigInt }[]
+    >`
+        SELECT t.id, t.name, COUNT(*) as count
+        FROM "QuizAttempt" qa
+        JOIN "Quiz" q ON qa."quizId" = q.id
+        JOIN "Topic" t ON q."topicId" = t.id
+        WHERE qa."userId" = ${user.id}
+        GROUP BY t.id, t.name
+        ORDER BY count DESC
+        LIMIT 5
+      `;
+
+    // Convert BigInt values to regular numbers
+    const popularTopics = topAttemptedTopics.map((item) => ({
+      id: item.id,
+      name: item.name,
+      count: Number(item.count),
+    }));
+
+    // Get favorite topics with full topic information
     const favoriteTopics = await prisma.userFavorite.findMany({
       where: { userId: user.id },
-      include: { topic: true },
+      include: {
+        topic: true,
+      },
     });
+
+    // Map favorite topics to include the topic properties directly
+    const mappedFavoriteTopics = favoriteTopics.map((f) => ({
+      id: f.topic.id, // Ensure the topic ID is included
+      name: f.topic.name,
+      description: f.topic.description,
+      favoriteId: f.id, // Include the favorite relationship ID if needed
+    }));
 
     const recommendedQuizzes = await prisma.quiz.findMany({
       where: {
@@ -272,11 +367,61 @@ export const getUserStats = async (req: Request, res: Response) => {
       },
     });
 
+    // If there are no favorite topics, get some recommended quizzes based on attempt history
+    let finalRecommendedQuizzes = recommendedQuizzes;
+    if (finalRecommendedQuizzes.length === 0 && topicDistribution.length > 0) {
+      // Get topics the user has attempted
+      const attemptedTopicNames = topicDistribution.map((t) => t.name);
+
+      // Find quizzes from topics the user has attempted but not taken yet
+      finalRecommendedQuizzes = await prisma.quiz.findMany({
+        where: {
+          topic: {
+            name: {
+              in: attemptedTopicNames,
+            },
+          },
+          attempts: {
+            none: {
+              userId: user.id,
+            },
+          },
+        },
+        take: 5,
+        include: {
+          topic: true,
+        },
+      });
+    }
+
+    // If still no recommended quizzes, get quizzes from popular topics (that the user hasn't attempted)
+    if (finalRecommendedQuizzes.length === 0 && popularTopics.length > 0) {
+      const popularTopicIds = popularTopics.map((t) => t.id);
+
+      finalRecommendedQuizzes = await prisma.quiz.findMany({
+        where: {
+          topicId: {
+            in: popularTopicIds,
+          },
+          attempts: {
+            none: {
+              userId: user.id,
+            },
+          },
+        },
+        take: 5,
+        include: {
+          topic: true,
+        },
+      });
+    }
+
     res.json({
       performance: stats,
       topicDistribution,
-      favoriteTopics: favoriteTopics.map((f) => f.topic),
-      recommendedQuizzes,
+      popularTopics,
+      favoriteTopics: mappedFavoriteTopics, // Updated to use our mapped format with IDs
+      recommendedQuizzes: finalRecommendedQuizzes,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
