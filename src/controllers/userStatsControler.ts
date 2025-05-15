@@ -268,16 +268,16 @@ export const getUserStats = async (req: Request, res: Response) => {
         0,
         Math.min(3, directAnswers.length)
       );
-      sampleAnswers.forEach((answer, i) => {
-        console.log(`Sample answer ${i + 1}:`, {
-          id: answer.id,
-          userAnswer: answer.userAnswer,
-          isCorrect: answer.isCorrect,
-          typeOfIsCorrect: typeof answer.isCorrect,
-          rawValue: JSON.stringify(answer.isCorrect),
-          attemptId: answer.attemptId,
-        });
-      });
+      // sampleAnswers.forEach((answer, i) => {
+      //   console.log(`Sample answer ${i + 1}:`, {
+      //     id: answer.id,
+      //     userAnswer: answer.userAnswer,
+      //     isCorrect: answer.isCorrect,
+      //     typeOfIsCorrect: typeof answer.isCorrect,
+      //     rawValue: JSON.stringify(answer.isCorrect),
+      //     attemptId: answer.attemptId,
+      //   });
+      // });
 
       // Check isCorrect data distribution
       const trueValues = directAnswers.filter(
@@ -312,9 +312,9 @@ export const getUserStats = async (req: Request, res: Response) => {
       if (stringTrueValues > trueValues) correctAnswerFormat = "string";
       else if (oneValues > trueValues) correctAnswerFormat = "number";
 
-      console.log(
-        `Detected isCorrect format appears to be: ${correctAnswerFormat}`
-      );
+      // console.log(
+      //   `Detected isCorrect format appears to be: ${correctAnswerFormat}`
+      // );
     }
 
     // Get quiz attempts data
