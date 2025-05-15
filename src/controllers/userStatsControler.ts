@@ -224,34 +224,236 @@ export const getUserStats = async (req: Request, res: Response) => {
   const { email } = req.body;
 
   try {
+    // console.log("================== GETTING USER STATS ==================");
+    // console.log(`Getting stats for email: ${email}`);
+
     const user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
+      console.log("User not found");
       return res.status(200).json({ message: "User does not exist" });
+    }
+
+    // console.log(`Found user with ID: ${user.id}`);
+
+    // CRITICAL: First, let's directly query answers to check what's in the database
+    const directAnswers = await prisma.answer.findMany({
+      where: {
+        attemptId: {
+          in: await prisma.quizAttempt
+            .findMany({
+              where: { userId: user.id },
+              select: { id: true },
+            })
+            .then((attempts) => attempts.map((a) => a.id)),
+        },
+      },
+      include: {
+        quizAttempt: {
+          select: {
+            id: true,
+            quizId: true,
+          },
+        },
+      },
+    });
+
+    // console.log(
+    //   `Direct answer query found ${directAnswers.length} answer records`
+    // );
+
+    if (directAnswers.length > 0) {
+      // Sample the first few answers to see their structure
+      const sampleAnswers = directAnswers.slice(
+        0,
+        Math.min(3, directAnswers.length)
+      );
+      sampleAnswers.forEach((answer, i) => {
+        console.log(`Sample answer ${i + 1}:`, {
+          id: answer.id,
+          userAnswer: answer.userAnswer,
+          isCorrect: answer.isCorrect,
+          typeOfIsCorrect: typeof answer.isCorrect,
+          rawValue: JSON.stringify(answer.isCorrect),
+          attemptId: answer.attemptId,
+        });
+      });
+
+      // Check isCorrect data distribution
+      const trueValues = directAnswers.filter(
+        (a) => a.isCorrect === true
+      ).length;
+      const falseValues = directAnswers.filter(
+        (a) => a.isCorrect === false
+      ).length;
+      const stringTrueValues = directAnswers.filter(
+        (a) => String(a.isCorrect) === "true"
+      ).length;
+      const stringFalseValues = directAnswers.filter(
+        (a) => String(a.isCorrect) === "false"
+      ).length;
+      const oneValues = directAnswers.filter(
+        (a) => String(a.isCorrect) === "1"
+      ).length;
+      const zeroValues = directAnswers.filter(
+        (a) => String(a.isCorrect) === "0"
+      ).length;
+
+      // console.log("isCorrect value distribution in database:");
+      // console.log(`- true (boolean): ${trueValues}`);
+      // console.log(`- false (boolean): ${falseValues}`);
+      // console.log(`- "true" (string): ${stringTrueValues}`);
+      // console.log(`- "false" (string): ${stringFalseValues}`);
+      // console.log(`- 1 (number): ${oneValues}`);
+      // console.log(`- 0 (number): ${zeroValues}`);
+
+      // CRITICAL FIX: Determine the most likely data format for isCorrect
+      let correctAnswerFormat = "boolean";
+      if (stringTrueValues > trueValues) correctAnswerFormat = "string";
+      else if (oneValues > trueValues) correctAnswerFormat = "number";
+
+      console.log(
+        `Detected isCorrect format appears to be: ${correctAnswerFormat}`
+      );
     }
 
     // Get quiz attempts data
     const quizAttempts = await prisma.quizAttempt.findMany({
       where: { userId: user.id },
       include: {
-        answers: true,
+        answers: {
+          include: {
+            question: {
+              select: {
+                id: true,
+                correctAnswer: true,
+                options: true,
+              },
+            },
+          },
+        },
       },
     });
 
-    // Calculate statistics
+    // console.log(
+    //   `Found ${quizAttempts.length} quiz attempts for user ${user.id}`
+    // );
+
+    // Calculate statistics with improved data type handling
     const totalQuizzes = quizAttempts.length;
     const completedQuizzes = quizAttempts.filter((qa) => qa.isCompleted).length;
-    const correctAnswers = quizAttempts.reduce(
-      (sum, qa) => sum + qa.answers.filter((a) => a.isCorrect).length,
-      0
-    );
-    const wrongAnswers = quizAttempts.reduce(
-      (sum, qa) => sum + qa.answers.filter((a) => !a.isCorrect).length,
-      0
-    );
+
+    // CRITICAL FIX: Use the isCorrect flag from the database
+    // This avoids the issue of comparing user answer text with correct answer index
+    let correctAnswers = 0;
+    let wrongAnswers = 0;
+
+    quizAttempts.forEach((qa, index) => {
+      // console.log(
+      //   `\nQuiz attempt ${index + 1} (ID: ${qa.id}): Has ${
+      //     qa.answers.length
+      //   } answers`
+      // );
+
+      // Count correct answers using isCorrect flag, since this was already
+      // properly calculated during the save process
+      const correctInThisAttempt = qa.answers.filter((a) => {
+        // IMPROVED: Primary way to check is using the isCorrect flag
+        if (
+          a.isCorrect === true ||
+          String(a.isCorrect).toLowerCase() === "true" ||
+          String(a.isCorrect) === "1"
+        ) {
+          return true;
+        }
+
+        // DEBUG: Log when using fallback comparison
+        if (
+          a.question &&
+          a.userAnswer &&
+          a.question.options &&
+          a.question.correctAnswer
+        ) {
+          //console.log(`Using fallback comparison for answer ${a.id}:`);
+
+          // Parse question options if needed
+          let options;
+          try {
+            if (typeof a.question.options === "string") {
+              options = JSON.parse(a.question.options);
+            } else {
+              options = a.question.options;
+            }
+          } catch (error) {
+            console.error(`Failed to parse options for answer ${a.id}`);
+            return false;
+          }
+
+          // Find the index of the user's answer in the options array
+          const userAnswerIndex = options.findIndex(
+            (option: string) => option === a.userAnswer
+          );
+
+          // Convert both to strings and compare
+          const userAnswerIndexStr = String(userAnswerIndex);
+          const correctAnswerStr = String(a.question.correctAnswer);
+
+          const isCorrect = userAnswerIndexStr === correctAnswerStr;
+
+          // console.log(
+          //   `User answer: "${a.userAnswer}" (index: ${userAnswerIndex})`
+          // );
+          // console.log(`Correct answer index: "${a.question.correctAnswer}"`);
+          // console.log(`Is correct: ${isCorrect}`);
+
+          return isCorrect;
+        }
+
+        return false;
+      }).length;
+
+      //console.log(`Correct answers in this attempt: ${correctInThisAttempt}`);
+      correctAnswers += correctInThisAttempt;
+      wrongAnswers += qa.answers.length - correctInThisAttempt;
+    });
+
+    // Double-check with direct calculation from raw answer data
+    const directCorrectCount = directAnswers.filter((a) => {
+      return (
+        a.isCorrect === true ||
+        String(a.isCorrect).toLowerCase() === "true" ||
+        String(a.isCorrect) === "1"
+      );
+    }).length;
+
+    const directWrongCount = directAnswers.length - directCorrectCount;
+
+    // console.log("\nComparing calculation methods:");
+    // console.log(
+    //   `- From quiz attempts: Correct=${correctAnswers}, Wrong=${wrongAnswers}, Total=${
+    //     correctAnswers + wrongAnswers
+    //   }`
+    // );
+    // console.log(
+    //   `- From direct answers: Correct=${directCorrectCount}, Wrong=${directWrongCount}, Total=${
+    //     directCorrectCount + directWrongCount
+    //   }`
+    // );
+
+    // CRITICAL FIX: If there's a discrepancy, use the direct counts
+    if (correctAnswers !== directCorrectCount) {
+      //console.log("Using direct answer counts due to discrepancy");
+      correctAnswers = directCorrectCount;
+      wrongAnswers = directWrongCount;
+    }
+
     const totalAnswers = correctAnswers + wrongAnswers;
     const averageAccuracy =
       totalAnswers > 0 ? correctAnswers / totalAnswers : 0;
+
+    // console.log(
+    //   `Final statistics: Correct answers: ${correctAnswers}, Wrong answers: ${wrongAnswers}, Total: ${totalAnswers}`
+    // );
 
     // Get unique topics attempted
     const uniqueTopics = await prisma.quiz.findMany({
@@ -416,14 +618,17 @@ export const getUserStats = async (req: Request, res: Response) => {
       });
     }
 
+    //console.log("================== END GETTING USER STATS ==================");
+
     res.json({
       performance: stats,
       topicDistribution,
       popularTopics,
-      favoriteTopics: mappedFavoriteTopics, // Updated to use our mapped format with IDs
+      favoriteTopics: mappedFavoriteTopics,
       recommendedQuizzes: finalRecommendedQuizzes,
     });
   } catch (error: any) {
+    console.error("Error in getUserStats:", error);
     res.status(500).json({ error: error.message });
   }
 };

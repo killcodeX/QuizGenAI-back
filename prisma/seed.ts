@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { jsQuizData, dmvQuizData, marvelQuizData, webDevQuizData, videoGamesQuizData } from "./smpleData";
 const prisma = new PrismaClient();
 
 async function main() {
@@ -10,10 +11,10 @@ async function main() {
     },
   });
 
-  const jsIITopicData = await prisma.topic.create({
+  const dmv = await prisma.topic.create({
     data: {
-      name: "JavaScript II",
-      description: "Advanced JavaScript programming concepts",
+      name: "Pennsylvania DMV",
+      description: "Sample questions for the PA driver's permit exam",
     },
   });
 
@@ -26,8 +27,22 @@ async function main() {
 
   const gamesTopicData = await prisma.topic.create({
     data: {
-      name: "Games",
+      name: "Video Games",
       description: "Video game knowledge and trivia",
+    },
+  });
+
+  const webDeTopicvData = await prisma.topic.create({
+    data: {
+      name: "Web Development Basics",
+      description: "Introduction to HTML, CSS, and JavaScript",
+    },
+  });
+
+  const worlWarTopicData = await prisma.topic.create({
+    data: {
+      name: "World War II",
+      description: "Major battles and turning points of the Second World War",
     },
   });
 
@@ -48,22 +63,56 @@ async function main() {
       difficulty: "MEDIUM",
       description: "Test your knowledge of JavaScript basics",
       questions: {
-        create: [
-          {
-            text: "What is hoisting in JavaScript?",
-            options: JSON.stringify([
-              "Moving declarations to the top of the scope",
-              "Removing unused variables",
-              "Optimizing the code execution",
-              "A way to organize imports",
-            ]),
-            correctAnswer: "0",
-            explanation:
-              "Hoisting is JavaScript's default behavior of moving declarations to the top of the scope.",
-            orderIndex: 0,
-          },
-          // Add more questions
-        ],
+        create: jsQuizData,
+      },
+    },
+  });
+
+  // Create sample quizzes and questions
+  const dmvQuiz = await prisma.quiz.create({
+    data: {
+      title: "Pennsylvania DMV",
+      topicId: dmv.id,
+      difficulty: "MEDIUM",
+      description: "Sample questions for the PA driver's permit exam",
+      questions: {
+        create: dmvQuizData,
+      },
+    },
+  });
+
+  const marvelQuiz = await prisma.quiz.create({
+    data: {
+      title: "Marvel",
+      topicId: marvelTopicData.id,
+      difficulty: "MEDIUM",
+      description: "Marvel Cinematic Universe knowledge",
+      questions: {
+        create: marvelQuizData,
+      },
+    },
+  });
+
+  const webDevQuiz = await prisma.quiz.create({
+    data: {
+      title: "Web Development Basics",
+      topicId: webDeTopicvData.id,
+      difficulty: "MEDIUM",
+      description: "Introduction to HTML, CSS, and JavaScript",
+      questions: {
+        create: webDevQuizData,
+      },
+    },
+  });
+
+  const videoGamesQuiz = await prisma.quiz.create({
+    data: {
+      title: "Video Games",
+      topicId: gamesTopicData.id,
+      difficulty: "MEDIUM",
+      description: "Video game knowledge and trivia",
+      questions: {
+        create: videoGamesQuizData,
       },
     },
   });

@@ -150,12 +150,14 @@ export const saveQuizResult = async (req: Request, res: Response) => {
   try {
     const { userId, quizId, score, totalPoints, selectedAnswers } = req.body;
     // console.log(
-    //   "Saving quiz result:",
+    //   "Saving quiz result for user:",
     //   userId,
+    //   "quiz:",
     //   quizId,
+    //   "score:",
     //   score,
-    //   totalPoints,
-    //   selectedAnswers
+    //   "total:",
+    //   totalPoints
     // );
 
     const user = await prisma.user.findUnique({
@@ -221,12 +223,23 @@ export const saveQuizResult = async (req: Request, res: Response) => {
 
         // Get selected answer text using the index
         const userAnswer =
-          Array.isArray(options) && options[answerIndex as number]
+          Array.isArray(options) && options[answerIndex as number] !== undefined
             ? options[answerIndex as number]
             : "Unknown";
 
-        // Check if answer is correct
-        const isCorrect = userAnswer === question.correctAnswer;
+        // CRITICAL FIX: The correctAnswer field contains the index, not the answer text
+        // Convert user-selected answer index to string for comparison
+        const userAnswerIndex = String(answerIndex);
+        const correctAnswerIndex = String(question.correctAnswer);
+
+        // Check if the selected index matches the correct index
+        const isCorrect = userAnswerIndex === correctAnswerIndex;
+
+        // console.log(`Question ID: ${questionId}`);
+        // console.log(`User Answer: "${userAnswer}" (index: ${answerIndex})`);
+        // console.log(`Correct Answer Index: "${question.correctAnswer}"`);
+        // console.log(`Is Correct: ${isCorrect}`);
+        // console.log("---");
 
         // Create the answer record
         return prisma.answer.create({
@@ -242,6 +255,15 @@ export const saveQuizResult = async (req: Request, res: Response) => {
 
     // Wait for all answers to be created
     const answers = await Promise.all(answerPromises);
+
+    // Count correct answers
+    const correctAnswers = answers.filter((a) => a && a.isCorrect).length;
+    const totalAnswers = answers.filter((a) => a !== null).length;
+
+    // console.log(`Total questions: ${totalAnswers}`);
+    // console.log(`Correct answers: ${correctAnswers}`);
+    // console.log(`Wrong answers: ${totalAnswers - correctAnswers}`);
+    // console.log("================== END SAVING QUIZ RESULT ==================");
 
     // Get the complete attempt with answers
     const completeAttempt = await prisma.quizAttempt.findUnique({
